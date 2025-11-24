@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotizador de Platos - WNS</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body, html {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background-color: #F9F9F9;
+            color: #333;
+            height: 100%;
+        }
+
+        .wizard-container {
+            max-width: 1100px;
+            margin: 3rem auto;
+            padding: 0 1rem;
+        }
+
+        .wizard-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .wizard-header h1 {
+            font-weight: 300;
+            font-size: 2.5rem;
+        }
+
+        /* --- CARD ESTILOS --- */
+        .recipe-card {
+            border: 2px solid #EEE;
+            border-radius: 12px;
+            padding: 1.5rem;
+            background: #FFF;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            height: 100%;
+            position: relative;
+        }
+
+        .recipe-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            border-color: #A9C1A0;
+        }
+
+        .recipe-card.selected {
+            border-color: #A9C1A0;
+            background-color: #F4F8F3;
+            box-shadow: 0 0 0 4px rgba(169, 193, 160, 0.2);
+        }
+
+        .recipe-title {
+            font-weight: 500;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            color: #222;
+        }
+
+        .ingredient-list {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 0;
+            padding-left: 1.2rem;
+        }
+
+        /* --- BOTONES --- */
+        .btn-primary-custom {
+            background-color: #A9C1A0;
+            color: #FFFFFF;
+            border: 2px solid #A9C1A0;
+            border-radius: 50px;
+            padding: 0.8rem 2rem;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .btn-primary-custom:hover {
+            background-color: #97ae8d;
+            border-color: #97ae8d;
+            color: white;
+        }
+        
+        .btn-outline-custom {
+            border: 2px solid #DDD;
+            color: #666;
+            border-radius: 50px;
+            padding: 0.8rem 2rem;
+        }
+        .btn-outline-custom:hover {
+            background-color: #EEE;
+            color: #333;
+        }
+
+        /* --- PASOS --- */
+        .step-section {
+            display: none; /* Ocultos por defecto */
+            animation: fadeIn 0.5s ease;
+        }
+        .step-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .price-display {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        .currency-label {
+            font-size: 1rem;
+            color: #888;
+            font-weight: 400;
+        }
+        
+        .result-box {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="wizard-container">
+    
+    <!-- HEADER -->
+    <div class="wizard-header">
+        <a href="{% url 'home' %}" style="text-decoration: none; color: #999; font-size: 0.9rem;">&larr; Volver al Inicio</a>
+        <h1 id="pageTitle">Selecciona un Plato</h1>
+        <div class="progress" style="height: 4px; max-width: 200px; margin: 1rem auto;">
+            <div class="progress-bar bg-success" id="progressBar" role="progressbar" style="width: 33%; background-color: #A9C1A0 !important;"></div>
+        </div>
+    </div>
+
+    <!-- ERROR ALERT -->
+    <div id="errorAlert" class="alert alert-danger d-none text-center" role="alert"></div>
+
+    <!-- STEP 1: SELECT RECIPE -->
+    <div id="step1" class="step-section active">
+        <div class="row g-4">
+            {% for recipe in recipes %}
+            <div class="col-12 col-md-6">
+                <div class="recipe-card" onclick="selectRecipe({{ recipe.id }}, '{{ recipe.name|escapejs }}', this)">
+                    <div class="recipe-title">{{ recipe.name }}</div>
+                    <p class="text-muted small">Ingredientes:</p>
+                    <ul class="ingredient-list">
+                        <!-- Mostramos solo los primeros 3 ingredientes para no saturar -->
+                        {% for item in recipe.items.all %}
+                            <li>{{ item.ingredient.name|capfirst }} : {{ item.quantity_raw }} kg</li>
+                        {% endfor %}
+                        
+                    </ul>
+                </div>
+            </div>
+            {% empty %}
+                <div class="col-12 text-center text-muted">
+                    <p>No hay recetas cargadas. <a href="{% url 'upload_data' %}">Cargar datos ahora</a>.</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- STEP 2: SELECT DATE -->
+    <div id="step2" class="step-section">
+        <div class="row justify-content-center">
+            <div class="col-md-6 text-center">
+                <h3 class="mb-4 font-weight-light">¿Para qué fecha deseas cotizar <br><strong id="selectedRecipeName"></strong>?</h3>
+                
+                <input type="date" id="dateInput" class="form-control form-control-lg text-center mx-auto mb-4" style="max-width: 300px;">
+                <p class="text-muted small">Puedes seleccionar fechas de hasta 30 días atrás.</p>
+
+                <div class="d-flex justify-content-center gap-3 mt-5">
+                    <button class="btn btn-outline-custom" onclick="goToStep(1)">Atrás</button>
+                    <button class="btn btn-primary-custom" id="btnCalculate" onclick="calculatePrice()">
+                        <span id="spinner" class="spinner-border spinner-border-sm d-none"></span>
+                        <span id="btnText">Consultar Precio</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 3: RESULTS -->
+    <div id="step3" class="step-section">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="result-box mb-4">
+                    <h5 class="text-muted mb-4">Costo Estimado al <span id="resultDate"></span></h5>
+                    
+                    <div class="row">
+                        <div class="col-md-6 border-end">
+                            <div class="price-display" id="resArs">$0</div>
+                            <div class="currency-label">Pesos Argentinos (ARS)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="price-display text-success" id="resUsd">$0</div>
+                            <div class="currency-label">Dólares Estadounidenses (USD)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 pt-3 border-top">
+                        <small class="text-muted">Tipo de Cambio utilizado: 1 USD = $<span id="resRate"></span> ARS</small>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button class="btn btn-outline-custom" onclick="resetWizard()">Cotizar otro plato</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ESTADO
+    let currentRecipeId = null;
+    let currentDate = null;
+
+    // CONFIGURACIÓN DE FECHAS (Min/Max 30 dias)
+    const dateInput = document.getElementById('dateInput');
+    const today = new Date();
+    const minDate = new Date();
+    minDate.setDate(today.getDate() - 30);
+
+    // Formatear a YYYY-MM-DD
+    const formatDate = (d) => d.toISOString().split('T')[0];
+    
+    dateInput.max = formatDate(today);
+    dateInput.min = formatDate(minDate);
+    dateInput.value = formatDate(today); // Default hoy
+
+    // NAVEGACIÓN
+    function goToStep(step) {
+        document.querySelectorAll('.step-section').forEach(el => el.classList.remove('active'));
+        document.getElementById(`step${step}`).classList.add('active');
+        
+        // Actualizar UI Header
+        const titles = {
+            1: "Selecciona un Plato",
+            2: "Selecciona una Fecha",
+            3: "Resultado de Cotización"
+        };
+        document.getElementById('pageTitle').textContent = titles[step];
+        document.getElementById('progressBar').style.width = `${step * 33}%`;
+        
+        // Ocultar errores al cambiar de paso
+        document.getElementById('errorAlert').classList.add('d-none');
+    }
+
+    // PASO 1: SELECCIONAR RECETA
+    function selectRecipe(id, name, cardElement) {
+        currentRecipeId = id;
+        document.getElementById('selectedRecipeName').textContent = name;
+        
+        // Visual Selection
+        document.querySelectorAll('.recipe-card').forEach(c => c.classList.remove('selected'));
+        cardElement.classList.add('selected');
+        
+        // Avanzar despues de una pequeña pausa visual
+        setTimeout(() => goToStep(2), 200);
+    }
+
+    // PASO 2 -> 3: CALCULAR
+    async function calculatePrice() {
+        currentDate = dateInput.value;
+        if (!currentDate) return;
+
+        const btn = document.getElementById('btnCalculate');
+        const spinner = document.getElementById('spinner');
+        const btnText = document.getElementById('btnText');
+        const errorAlert = document.getElementById('errorAlert');
+
+        // Loading State
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        btnText.textContent = 'Calculando...';
+        errorAlert.classList.add('d-none');
+
+        try {
+            const response = await fetch("{% url 'api:calculate_price' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    recipe_id: currentRecipeId,
+                    date: currentDate
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Popular Resultados
+                document.getElementById('resultDate').textContent = currentDate;
+                
+                // Formateador de moneda
+                const fmtArs = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
+                const fmtUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+                document.getElementById('resArs').textContent = fmtArs.format(data.total_ars);
+                document.getElementById('resUsd').textContent = fmtUsd.format(data.total_usd);
+                document.getElementById('resRate').textContent = data.exchange_rate.toFixed(2);
+
+                goToStep(3);
+            } else {
+                throw new Error(data.error || 'Error desconocido');
+            }
+
+        } catch (error) {
+            errorAlert.textContent = error.message;
+            errorAlert.classList.remove('d-none');
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('d-none');
+            btnText.textContent = 'Consultar Precio';
+        }
+    }
+
+    function resetWizard() {
+        currentRecipeId = null;
+        document.querySelectorAll('.recipe-card').forEach(c => c.classList.remove('selected'));
+        goToStep(1);
+    }
+</script>
+
+</body>
+</html>

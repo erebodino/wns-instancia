@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo de Recetas - WNS</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        body, html {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background-color: #F8F9FA;
+            color: #333;
+        }
+
+        .catalog-header {
+            background-color: #FFFFFF;
+            padding: 2rem 0;
+            border-bottom: 1px solid #EAEAEA;
+            margin-bottom: 2rem;
+        }
+
+        .recipe-card {
+            border: none;
+            border-radius: 16px;
+            background: #FFFFFF;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .recipe-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+        }
+
+        .card-header-custom {
+            background-color: #A9C1A0;
+            color: white;
+            padding: 1.2rem;
+            font-weight: 500;
+            font-size: 1.1rem;
+            border-bottom: none;
+        }
+
+        .card-body-custom {
+            padding: 1.5rem;
+            flex-grow: 1;
+        }
+
+        .ingredients-list {
+            margin: 0;
+            padding-left: 1.2rem;
+            font-size: 0.9rem;
+            color: #555;
+            margin-bottom: 1.5rem;
+        }
+
+        .ingredients-list li {
+            margin-bottom: 0.4rem;
+        }
+
+        .control-area {
+            background-color: #F9F9F9;
+            padding: 1.2rem;
+            border-top: 1px solid #EEE;
+        }
+
+        .result-area {
+            background-color: #fff;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 12px;
+            border: 1px solid #E0E0E0;
+            display: none; /* Oculto por defecto */
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .price-tag-ars {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .price-tag-usd {
+            font-size: 1rem;
+            color: #28a745;
+            font-weight: 500;
+        }
+
+        .btn-calculate {
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .btn-calculate:hover {
+            background-color: #555;
+        }
+
+        .back-link {
+            text-decoration: none;
+            color: #666;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .back-link:hover { color: #000; }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <div class="catalog-header text-center">
+        <div class="container position-relative">
+            <div class="position-absolute start-0 top-50 translate-middle-y d-none d-md-block">
+                <a href="{% url 'home' %}" class="back-link"><i class="bi bi-arrow-left"></i> Volver</a>
+            </div>
+            <h1 style="font-weight: 300;">Catálogo de Platos</h1>
+            <p class="text-muted">Seleccione una fecha para cotizar los ingredientes del día.</p>
+        </div>
+    </div>
+
+    <!-- Grid de Recetas -->
+    <div class="container mb-5">
+        <div class="row g-4">
+            {% for recipe in recipes %}
+            <div class="col-md-6 col-lg-4">
+                <div class="recipe-card" id="card-{{ recipe.id }}">
+                    <!-- Header -->
+                    <div class="card-header-custom">
+                        {{ recipe.name }}
+                    </div>
+                
+                    <!-- Cuerpo: Lista de Ingredientes -->
+                    <div class="card-body-custom">
+                        <h6 class="text-muted text-uppercase small fw-bold mb-3">Ingredientes y Cantidades:</h6>
+                        <ul class="ingredients-list">
+                            {% for item in recipe.items.all %}
+                                <li>
+                                    <!-- CORRECCIÓN: Aseguramos mostrar el nombre raw si el linkeado falla -->
+                                    <strong>{{ item.ingredient_name_raw|default:item.ingredient.name|default:"Ingrediente" }}</strong>: 
+                                    {{ item.quantity_raw|floatformat }} kg
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                
+                    <!-- Controles: Fecha y Botón -->
+                    <div class="control-area">
+                        <label class="small text-muted mb-1">Fecha de cotización:</label>
+                        <input type="date" class="form-control mb-3 date-picker" id="date-{{ recipe.id }}">
+                        
+                        <button class="btn btn-calculate" onclick="calculatePrice({{ recipe.id }})">
+                            <span class="spinner-border spinner-border-sm d-none" id="spinner-{{ recipe.id }}"></span>
+                            <span id="btn-text-{{ recipe.id }}">Cotizar Plato</span>
+                        </button>
+                
+                        <!-- Área de Error -->
+                        <div id="error-{{ recipe.id }}" class="alert alert-danger mt-3 d-none small p-2 mb-0"></div>
+                
+                        <!-- NUEVA ESTRUCTURA DE RESULTADOS -->
+                        <div id="result-{{ recipe.id }}" class="result-area">
+                            <h6 class="text-center text-muted small mb-3 border-bottom pb-2">Costo Total Estimado</h6>
+                            
+                            <div class="row g-0">
+                                <!-- Columna Pesos -->
+                                <div class="col-6 border-right-custom">
+                                    <div class="price-box">
+                                        <div class="price-value" id="ars-{{ recipe.id }}">$0</div>
+                                        <span class="currency-label label-ars">Pesos (ARS)</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Columna Dólares -->
+                                <div class="col-6">
+                                    <div class="price-box">
+                                        <div class="price-value" id="usd-{{ recipe.id }}">$0</div>
+                                        <span class="currency-label label-usd">Dólares (USD)</span>
+                                    </div>
+                                </div>
+                            </div>
+                
+                            <div class="text-center mt-3 pt-2 border-top">
+                                <small class="text-muted" style="font-size: 0.75rem;">
+                                    Tipo de cambio: 1 USD = $<span id="rate-{{ recipe.id }}"></span> ARS
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12 text-center py-5">
+                <h3 class="text-muted fw-light">No hay recetas cargadas en el sistema.</h3>
+                <a href="{% url 'upload_data' %}" class="btn btn-outline-secondary mt-3">Cargar Datos</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Configurar restricciones de fechas para todos los inputs
+            const today = new Date();
+            const minDate = new Date();
+            minDate.setDate(today.getDate() - 30);
+
+            const formatDate = (d) => d.toISOString().split('T')[0];
+            const maxStr = formatDate(today);
+            const minStr = formatDate(minDate);
+
+            document.querySelectorAll('.date-picker').forEach(input => {
+                input.max = maxStr;
+                input.min = minStr;
+                input.value = maxStr; // Default hoy
+            });
+        });
+
+        async function calculatePrice(recipeId) {
+            const dateInput = document.getElementById(`date-${recipeId}`);
+            const spinner = document.getElementById(`spinner-${recipeId}`);
+            const btnText = document.getElementById(`btn-text-${recipeId}`);
+            const errorDiv = document.getElementById(`error-${recipeId}`);
+            const resultDiv = document.getElementById(`result-${recipeId}`);
+
+            // Reset UI
+            errorDiv.classList.add('d-none');
+            resultDiv.style.display = 'none'; // Usamos display style para la animación
+            
+            // Validar fecha
+            if (!dateInput.value) {
+                showError(recipeId, "Seleccione una fecha válida.");
+                return;
+            }
+
+            // Loading state
+            const originalText = btnText.textContent;
+            btnText.textContent = "Calculando...";
+            spinner.classList.remove('d-none');
+            
+            try {
+                const response = await fetch("{% url 'api:calculate_price' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        recipe_id: recipeId,
+                        date: dateInput.value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Renderizar Resultado
+                    const fmtArs = new Intl.NumberFormat('es-AR', { 
+                        style: 'currency', 
+                        currency: 'ARS', 
+                        maximumFractionDigits: 0 // Sin centavos en ARS para que se vea más limpio (opcional)
+                    });
+                    
+                    const fmtUsd = new Intl.NumberFormat('en-US', { 
+                        style: 'currency', 
+                        currency: 'USD',
+                        minimumFractionDigits: 2
+                    });
+
+                    document.getElementById(`ars-${recipeId}`).textContent = fmtArs.format(data.total_ars);
+                    document.getElementById(`usd-${recipeId}`).textContent = fmtUsd.format(data.total_usd);
+                    document.getElementById(`rate-${recipeId}`).textContent = data.exchange_rate.toFixed(2);
+
+                    resultDiv.style.display = 'block'; 
+                } else {
+                    showError(recipeId, data.error || "Error al calcular costo.");
+                }
+
+            } catch (e) {
+                console.error(e);
+                showError(recipeId, "Error de conexión.");
+            } finally {
+                spinner.classList.add('d-none');
+                btnText.textContent = originalText;
+            }
+        }
+
+        function showError(id, msg) {
+            const el = document.getElementById(`error-${id}`);
+            el.textContent = msg;
+            el.classList.remove('d-none');
+        }
+    </script>
+</body>
+</html>
