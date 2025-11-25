@@ -5,12 +5,29 @@ from django.utils import timezone
 from core.models import CookingRecipe
 
 class PricingService:
+    """
+    Service responsible for calculating recipe costs.
+
+    Handles currency conversion and recipe pricing logic.
+    """
     
     API_URL_TEMPLATE = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@{date}/v1/currencies/usd.json"
 
     def calculate_recipe_cost(self, recipe_id: int, date_str: str) -> dict:
         """
-        Calcula el costo en ARS y USD para una receta y fecha dadas.
+        Calculates the cost in ARS and USD for a given recipe and date.
+
+        Args:
+            recipe_id (int): The ID of the recipe to calculate.
+            date_str (str): The date for the calculation in "YYYY-MM-DD" format.
+
+        Returns:
+            dict: A dictionary containing the recipe name, total cost in ARS and USD,
+                  and the exchange rate used.
+
+        Raises:
+            ValueError: If the recipe does not exist, the date format is invalid,
+                        or the date is not within the last 30 days.
         """
         # 1. Validar Receta
         try:
@@ -53,7 +70,18 @@ class PricingService:
         }
 
     def _get_usd_rate(self, date_obj) -> Decimal:
-        """Consulta la API externa"""
+        """
+        Queries the external API to retrieve the USD exchange rate.
+
+        Args:
+            date_obj (date): The date object for which to get the exchange rate.
+
+        Returns:
+            Decimal: The USD to ARS exchange rate.
+
+        Raises:
+            ValueError: If the exchange rate cannot be retrieved.
+        """
         date_str = date_obj.strftime("%Y-%m-%d")
         url = self.API_URL_TEMPLATE.format(date=date_str)
         

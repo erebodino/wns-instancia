@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser
 from .serializers import FileUploadSerializer
-from core.parsers import ETLService
-from .helpers import PricingService
+from core.services import ETLService
+from .services import PricingService
 
 class BaseUploadView(APIView):
     parser_classes = [MultiPartParser]
@@ -13,7 +13,7 @@ class BaseUploadView(APIView):
         serializer = FileUploadSerializer(data=request.data)
         if serializer.is_valid():
             try:
-                # request.FILES['file'] viene validado por el serializer
+
                 file_obj = serializer.validated_data['file']
                 result_data = service_method(file_obj)
                 human_message = f"Se procesaron {result_data['processed_count']} items."
@@ -29,15 +29,15 @@ class BaseUploadView(APIView):
                 return Response({'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class RecetasUploadView(BaseUploadView):
+class RecipesUploadView(BaseUploadView):
     def post(self, request):
         return self.process_upload(request, ETLService().import_recipes)
 
-class VerdurasUploadView(BaseUploadView):
+class VegetablesUploadView(BaseUploadView):
     def post(self, request):
         return self.process_upload(request, ETLService().import_vegetables)
 
-class CarnesUploadView(BaseUploadView):
+class MeatsUploadView(BaseUploadView):
     def post(self, request):
         return self.process_upload(request, ETLService().import_meats)
 

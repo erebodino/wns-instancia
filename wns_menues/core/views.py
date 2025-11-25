@@ -1,5 +1,6 @@
 from django.shortcuts import render, HttpResponse
 from core.models import CookingRecipe
+
 def home(request):
     return render(request, 'home_2.html')
 
