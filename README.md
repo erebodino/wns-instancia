@@ -17,18 +17,18 @@ Sistema integral para la gestión automatizada de costos de recetas e ingesta de
 El objetivo del proyecto es resolver un challenge tecnico para WNS. El sistema actúa como un pipeline ETL (Extract, Transform, Load) que:
 1.  **Extrae** información no estructurada de listas de precios de proveedores (PDFs, Excels) y recetas (Markdown).
 2.  **Transforma** y normaliza unidades (conversión a KG, normalización de cantidades).
-3.  **Carga** la información en una base de datos relacional manteniendo la integridad referencial.
+3.  **Carga** la información en una base de datos.
 4.  **Calcula** el costo de una receta en ARS y USD según una fecha específica provista por el usuario.
 
 ---
 
 ## Arquitectura y Diseño
 
-El proyecto fue construido utilizando **Python 3.x** y **Django**, siguiendo una arquitectura híbrida:
+El proyecto fue construido utilizando **Python** y **Django**, siguiendo una arquitectura híbrida:
 
 *   **Backend Core (Django):** Maneja la persistencia de datos, el ORM y la lógica de negocio principal.
-*   **Service Layer (`core/parsers.py`):** Se implementó un patrón de *Servicios* (`ETLService`) para desacoplar la lógica de extracción de las vistas. Esto facilita el testing unitario y la reutilización de código.
-*   **API REST (Django Rest Framework):** Expone endpoints para las operaciones de carga (POST) y cálculo, permitiendo que el frontend opere de manera asíncrona sin recargas completas.
+*   **Service Layer (`core/parsers.py`):** Se implementó un patrón de *Servicios* (`ETLService`) para desacoplar la lógica de extracción de las vistas. Esto facilita el testing unitario.
+*   **API REST (Django Rest Framework):** Expone endpoints para las operaciones de carga (POST) y cálculo, permitiendo que el frontend opere sin recargas completas.
 *   **Frontend (Django Templates):** Se utiliza *Server-Side Rendering* (SSR) para la entrega rápida de vistas de lectura (GET), manteniendo la simplicidad del desarrollo.
 
 ### Stack Tecnológico
@@ -44,17 +44,20 @@ El proyecto fue construido utilizando **Python 3.x** y **Django**, siguiendo una
 ## Instalación y Ejecución
 
 ### Requisitos Previos
-*   Docker y Docker Compose (Recomendado)
+*   Docker y Docker Compose
 
 ### Despliegue con Docker
 El proyecto incluye una configuración de contenedores para facilitar el despliegue inmediato.
 
 1. Clonar el repositorio:
-   git clone <URL_DEL_REPO>
-   cd wns-instancia
-   2. Levantar los servicios:
-   docker-compose up -d --build
-   3. Acceder a la aplicación en: `http://localhost:8000`
+   git clone <https://github.com/erebodino/wns-instancia>
+2. Cambiar al repositorio donde esta el dockerfile y el proyecto `cd wns-instancia`
+3. Levantar los servicios:
+   `docker-compose up -d --build`
+4. Acceder a la aplicación en: `http://localhost:8000`
+
+### Despliegue manual
+Se utilizo Docker para mostrar su uso, pero tambien se puede ejecutar el proyecto a traves de un gestor de entornos `pipenv`, el Pipfile se incluye por lo que puede ser replicado de esta forma tambien.
 
 
 ## Decisiones Técnicas
@@ -89,15 +92,17 @@ Para el correcto funcionamiento del sistema, se asume lo siguiente:
 
 Si se deseara llevar esta solución a un entorno de producción masivo, implementaría los siguientes cambios:
 
-1.  **Procesamiento Asíncrono (Celery + Redis):** Actualmente, el parsing se hace en el hilo de la request. Para archivos grandes (>10MB o cientos de páginas), esto bloquearía el servidor. La solución es mover el procesamiento a una cola de tareas background (Workers) y notificar al usuario cuando la carga finalice.
+1.  **Procesamiento Asíncrono:** Actualmente, el parsing se hace en el hilo de la request. Para archivos grandes (>10MB o cientos de páginas), esto bloquearía el servidor. La solución es mover el procesamiento a una cola de tareas background (Workers) y notificar al usuario cuando la carga finalice.
 
 2.  **Strategy Pattern para Parsers:** Refactorizar la clase `FileParser` para implementar un patrón *Strategy* completo. Esto permitiría agregar nuevos "Proveedores" (con formatos de archivo distintos) simplemente creando una nueva clase estrategia sin modificar el código existente.
 
 3.  **Caching:** Implementar caché (ej. Memcached/Redis) para los cálculos de recetas consultadas frecuentemente, invalidando la caché solo cuando se sube una nueva lista de precios que afecte a dicha receta.
 
-4. **LLMs** En caso de hacer que la app escale sin restriccion abierta a todos los posibles usuarios, seria imposible mantener una clase ETL para cada empresa/usuario. En ese caso utilizaria un LLM con un output validado con pydantic para que el LLM extraiga la información y la devuelva normalizada.
+4. **LLMs** En caso de hacer que la app escale sin restriccion abierta a todos los posibles usuarios, seria imposible mantener una clase ETL para cada empresa/usuario. En ese caso utilizaria un LLM con un output validado para que el LLM extraiga la información y la devuelva normalizada.
 
-5. **Profiles**: El funcionamiento actual es muy basico. Si se va a escalar la app para varias empresas/usuarios, habria que generar un perfil, o bien una empresa que contenga perfiles y estos tienen sus ingredientes, recetas y precios. Es decir que se debe generar nuevos modelos para dar soporte a esta estructura. Se debera impleentar un Login, logout, etc.
+5. **Perfiles**: El funcionamiento actual es muy basico. Si se va a escalar la app para varias empresas/usuarios, habria que generar un perfil, o bien una empresa que contenga perfiles y estos tienen sus ingredientes, recetas y precios. Es decir que se debe generar nuevos modelos para dar soporte a esta estructura. Se debera implementar un Login, logout, etc.
 
-6. **Documentación Automática (OpenAPI/Swagger)**: Dado el alcance acotado del desafío, no se incluyó documentación interactiva. En un entorno productivo, integraría la librería **`drf-spectacular`** para generar automáticamente una especificación **OpenAPI 3.0**. Esto permitiría exponer una interfaz **Swagger UI** o **Redoc**, facilitando que los desarrolladores frontend o clientes externos prueben los endpoints y entiendan los esquemas de datos sin necesidad de leer el código fuente.
+6. **Documentación Automática**: Dado el alcance acotado del desafío, no se incluyó documentación interactiva. En un entorno productivo, integraría alguna libreria para generar automáticamente una documentación que cumpla con algún estander y genere una interfaz **Swagger UI** (por ejemplo), facilitando que los desarrolladores frontend o clientes externos prueben los endpoints y entiendan los esquemas de datos sin necesidad de leer el código fuente.
+
+7. **Manual de usuario**: En caso de escalar, tambien seria de utilidad un manual de usuario para usuarios no tecnicos, que les permita entender como funciona la app y en caso de errores, porque se sucedieron estos. Esto le brinda mas seguridad al usuario ya que no se siente totalmente ajeno a la app, sino que entiende los flujos de trabajos y los errores. 
 
